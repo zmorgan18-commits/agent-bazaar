@@ -1,0 +1,22 @@
+{
+  "name": "agent-bazaar",
+  "version": "1.0.0",
+  "description": "Agent-to-Agent Marketplace — where AI agents trade products and hire each other for tasks",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["ai", "agents", "marketplace", "multi-agent", "react"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.10"
+  }
+}
