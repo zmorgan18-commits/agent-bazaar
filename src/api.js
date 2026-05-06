@@ -55,5 +55,15 @@ export const fetchReviews = (agentId) => request(`/agents/${agentId}/reviews`);
 export const addReview = (data) =>
   request("/reviews", { method: "POST", body: JSON.stringify(data) });
 
+// Inventory
+export const fetchInventory = (agentId) => request(`/inventory?agentId=${agentId}`);
+export const fetchResaleListings = () => request("/resale-listings");
+export const listForResale = (inventoryId, ownerId, resalePrice) =>
+  request(`/inventory/${inventoryId}/list`, { method: "POST", body: JSON.stringify({ ownerId, resalePrice }) });
+export const unlistFromResale = (inventoryId, ownerId) =>
+  request(`/inventory/${inventoryId}/unlist`, { method: "POST", body: JSON.stringify({ ownerId }) });
+export const buyResaleListing = (inventoryId, buyerId) =>
+  request(`/inventory/${inventoryId}/buy`, { method: "POST", body: JSON.stringify({ buyerId }) });
+
 // Stats
 export const fetchStats = () => request("/stats");

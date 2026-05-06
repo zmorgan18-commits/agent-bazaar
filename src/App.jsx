@@ -10,10 +10,11 @@ import CreateTaskForm from "./components/CreateTaskForm";
 import TransactionHistory from "./components/TransactionHistory";
 import MessageCenter from "./components/MessageCenter";
 import BidPanel from "./components/BidPanel";
+import Inventory from "./components/Inventory";
 
 export default function App() {
   const {
-    currentAgent, agents, products, tasks, stats, loading, toast, showToast,
+    currentAgent, agents, products, tasks, stats, loading, apiError, retry, toast, showToast,
     purchaseProduct, hireAgent, refresh,
   } = useMarket();
 
@@ -65,6 +66,56 @@ export default function App() {
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>◈</div>
           <div>Loading AgentBazaar...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (apiError) {
+    return (
+      <div style={{
+        background: "#0a0e17", color: "#e2e8f0", minHeight: "100vh",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+      }}>
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
+        <div style={{ textAlign: "center", maxWidth: 480, padding: 24 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <h1 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 800, color: "#e63946" }}>
+            API Server Not Reachable
+          </h1>
+          <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6, marginBottom: 20 }}>
+            The AgentBazaar backend is not running. The marketplace needs both the frontend and API server.
+          </p>
+          <div style={{
+            background: "#111827", border: "1px solid #1e293b", borderRadius: 10,
+            padding: 20, textAlign: "left", marginBottom: 20,
+          }}>
+            <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 10 }}>
+              Run this in your terminal
+            </div>
+            <code style={{
+              display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
+              color: "#00f5d4", background: "#0a0e17", padding: 12, borderRadius: 6,
+              border: "1px solid #1e293b",
+            }}>
+              npm run dev
+            </code>
+            <p style={{ fontSize: 12, color: "#475569", marginTop: 10, marginBottom: 0, lineHeight: 1.5 }}>
+              This starts both the API server (port 3001) and the frontend (port 3000) together.
+              If you're only running <code style={{ color: "#94a3b8" }}>vite</code> or <code style={{ color: "#94a3b8" }}>npm run dev:client</code>, the backend won't be available.
+            </p>
+          </div>
+          <button onClick={retry} style={{
+            background: "#00f5d4", color: "#000", border: "none", borderRadius: 8,
+            padding: "12px 32px", fontSize: 14, fontWeight: 800, cursor: "pointer",
+            textTransform: "uppercase", letterSpacing: 1,
+          }}>
+            Retry Connection
+          </button>
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 12 }}>
+            Error: {apiError}
+          </div>
         </div>
       </div>
     );
@@ -162,6 +213,7 @@ export default function App() {
             { key: "products", label: "Products", icon: "🏪" },
             { key: "agents", label: "Agents", icon: "🤖" },
             { key: "tasks", label: "Tasks", icon: "📋" },
+            { key: "inventory", label: "Inventory", icon: "📦" },
             { key: "transactions", label: "Ledger", icon: "📒" },
             { key: "messages", label: "Messages", icon: "💬" },
           ].map((t) => (
@@ -182,7 +234,7 @@ export default function App() {
           ))}
         </div>
 
-        {(tab === "products" || tab === "agents" || tab === "tasks") && (
+        {(tab === "products" || tab === "agents" || tab === "tasks" || tab === "inventory") && (
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -246,6 +298,7 @@ export default function App() {
             ))}
           </div>
         )}
+        {tab === "inventory" && <Inventory />}
         {tab === "transactions" && <TransactionHistory />}
         {tab === "messages" && <MessageCenter />}
 
