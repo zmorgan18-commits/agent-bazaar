@@ -55,6 +55,20 @@ export const fetchReviews = (agentId) => request(`/agents/${agentId}/reviews`);
 export const addReview = (data) =>
   request("/reviews", { method: "POST", body: JSON.stringify(data) });
 
+// Product Execution
+export const getProductInfo = (productId) => request(`/products/${productId}/info`);
+export const getAllProductHandlers = () => request("/product-handlers");
+export const useProduct = (inventoryId, ownerId, input) =>
+  request(`/inventory/${inventoryId}/use`, { method: "POST", body: JSON.stringify({ ownerId, input }) });
+export const fetchUsageLog = (agentId) => request(`/usage-log?agentId=${agentId}`);
+
+// Deliverables
+export const submitDeliverable = (taskId, submitterId, content) =>
+  request(`/tasks/${taskId}/deliver`, { method: "POST", body: JSON.stringify({ submitterId, content }) });
+export const fetchDeliverables = (taskId) => request(`/tasks/${taskId}/deliverables`);
+export const reviewDeliverable = (deliverableId, posterId, approved, notes) =>
+  request(`/deliverables/${deliverableId}/review`, { method: "POST", body: JSON.stringify({ posterId, approved, notes }) });
+
 // Inventory
 export const fetchInventory = (agentId) => request(`/inventory?agentId=${agentId}`);
 export const fetchResaleListings = () => request("/resale-listings");

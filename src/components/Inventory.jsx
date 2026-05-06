@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useMarket } from "../context/MarketContext";
 import { Modal, Tag } from "./ui";
+import UseProduct from "./UseProduct";
 
 export default function Inventory() {
   const { inventory, resaleListings, currentAgent, listForResale, unlistFromResale, buyResaleListing } = useMarket();
   const [resaleItem, setResaleItem] = useState(null);
   const [resalePrice, setResalePrice] = useState("");
   const [viewTab, setViewTab] = useState("my");
+  const [useItem, setUseItem] = useState(null);
 
   if (!currentAgent) {
     return (
@@ -102,21 +104,29 @@ export default function Inventory() {
                     {item.listedForResale && <span>Asking: <strong style={{ color: "#ffbe0b" }}>{item.resalePrice} cr</strong></span>}
                   </div>
 
-                  {item.listedForResale ? (
-                    <button onClick={() => unlistFromResale(item.id)} style={{
-                      width: "100%", padding: "10px", background: "var(--border)", color: "var(--text-secondary)",
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => setUseItem(item)} style={{
+                      flex: 1, padding: "10px", background: "#06d6a0", color: "#000",
                       border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer", textTransform: "uppercase",
                     }}>
-                      Remove from Resale
+                      Use
                     </button>
-                  ) : (
-                    <button onClick={() => { setResaleItem(item); setResalePrice(item.originalPrice.toString()); }} style={{
-                      width: "100%", padding: "10px", background: item.productColor, color: "#000",
-                      border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer", textTransform: "uppercase",
-                    }}>
-                      List for Resale
-                    </button>
-                  )}
+                    {item.listedForResale ? (
+                      <button onClick={() => unlistFromResale(item.id)} style={{
+                        flex: 1, padding: "10px", background: "var(--border)", color: "var(--text-secondary)",
+                        border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer", textTransform: "uppercase",
+                      }}>
+                        Unlist
+                      </button>
+                    ) : (
+                      <button onClick={() => { setResaleItem(item); setResalePrice(item.originalPrice.toString()); }} style={{
+                        flex: 1, padding: "10px", background: item.productColor, color: "#000",
+                        border: "none", borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: "pointer", textTransform: "uppercase",
+                      }}>
+                        Resell
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -200,6 +210,11 @@ export default function Inventory() {
           )}
         </>
       )}
+
+      {/* Use Product Modal */}
+      <Modal open={!!useItem} onClose={() => setUseItem(null)}>
+        <UseProduct item={useItem} onClose={() => setUseItem(null)} />
+      </Modal>
 
       {/* Resale Price Modal */}
       <Modal open={!!resaleItem} onClose={() => { setResaleItem(null); setResalePrice(""); }}>

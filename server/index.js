@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import * as db from "./db.js";
+import { executeProduct, getProductInfo, getAllProductInfo } from "./engine.js";
 
 const app = express();
 app.use(cors());
@@ -149,6 +150,56 @@ app.post("/api/reviews", wrap((req, res) => {
   }
   const review = db.addReview({ reviewerId, targetId, productId, rating: parseFloat(rating), comment });
   res.status(201).json(review);
+}));
+
+/* ────────────────────── Product Execution ────────────────────── */
+app.get("/api/products/:id/info", wrap((req, res) => {
+  const info = getProductInfo(req.params.id);
+  if (!info) return res.status(404).json({ error: "No execution handler for this product" });
+  res.json(info);
+}));
+
+app.get("/api/product-handlers", wrap((req, res) => {
+  res.json(getAllProductInfo());
+}));
+
+app.post("/api/inventory/:id/use", wrap((req, res) => {
+  const { ownerId, input } = req.body;
+  if (!ownerId || input === undefined) return res.status(400).json({ error: "ownerId and input are required" });
+
+  const item = db.getInventory(ownerId).find(i => i.id === req.params.id);
+  if (!item) return res.status(404).json({ error: "You don't own this product" });
+
+  const result = executeProduct(item.productId, input);
+  if (result.error) return res.status(400).json(result);
+
+  db.logUsage(ownerId, item.productId, input, result.result);
+  res.json(result);
+}));
+
+app.get("/api/usage-log", wrap((req, res) => {
+  const { agentId } = req.query;
+  if (!agentId) return res.status(400).json({ error: "agentId query param required" });
+  res.json(db.getUsageLog(agentId));
+}));
+
+/* ────────────────────── Deliverables ────────────────────── */
+app.post("/api/tasks/:id/deliver", wrap((req, res) => {
+  const { submitterId, content } = req.body;
+  if (!submitterId || !content) return res.status(400).json({ error: "submitterId and content are required" });
+  const result = db.submitDeliverable(req.params.id, submitterId, content);
+  res.status(201).json(result);
+}));
+
+app.get("/api/tasks/:id/deliverables", wrap((req, res) => {
+  res.json(db.getDeliverables(req.params.id));
+}));
+
+app.post("/api/deliverables/:id/review", wrap((req, res) => {
+  const { posterId, approved, notes } = req.body;
+  if (!posterId || approved === undefined) return res.status(400).json({ error: "posterId and approved are required" });
+  const task = db.reviewDeliverable(req.params.id, posterId, approved, notes);
+  res.json(task);
 }));
 
 /* ────────────────────── Inventory ────────────────────── */

@@ -109,6 +109,25 @@ db.exec(`
     listed_for_resale INTEGER NOT NULL DEFAULT 0,
     resale_price REAL
   );
+
+  CREATE TABLE IF NOT EXISTS usage_log (
+    id          TEXT PRIMARY KEY,
+    owner_id    TEXT NOT NULL REFERENCES agents(id),
+    product_id  TEXT NOT NULL REFERENCES products(id),
+    input       TEXT NOT NULL,
+    output      TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS deliverables (
+    id          TEXT PRIMARY KEY,
+    task_id     TEXT NOT NULL REFERENCES tasks(id),
+    submitter_id TEXT NOT NULL REFERENCES agents(id),
+    content     TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'submitted',
+    reviewer_notes TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 /* ────────────────────────── Seed ────────────────────────── */
@@ -581,6 +600,68 @@ export const buyResaleListing = (inventoryId, buyerId) => {
   txn();
   return { buyer: getAgent(buyerId), seller: getAgent(item.owner_id) };
 };
+
+// Usage Log
+export const logUsage = (ownerId, productId, input, output) => {
+  const id = uuid();
+  db.prepare(`INSERT INTO usage_log (id, owner_id, product_id, input, output) VALUES (?, ?, ?, ?, ?)`).run(id, ownerId, productId, JSON.stringify(input), JSON.stringify(output));
+  return id;
+};
+
+export const getUsageLog = (ownerId) =>
+  db.prepare(`SELECT u.*, p.name as product_name, p.icon as product_icon FROM usage_log u JOIN products p ON u.product_id = p.id WHERE u.owner_id = ? ORDER BY u.created_at DESC LIMIT 50`).all(ownerId).map(row => ({
+    id: row.id,
+    ownerId: row.owner_id,
+    productId: row.product_id,
+    productName: row.product_name,
+    productIcon: row.product_icon,
+    input: JSON.parse(row.input),
+    output: JSON.parse(row.output),
+    createdAt: row.created_at,
+  }));
+
+// Deliverables
+export const submitDeliverable = (taskId, submitterId, content) => {
+  const task = getTask(taskId);
+  if (!task) throw new Error("Task not found");
+  if (task.assigneeId !== submitterId) throw new Error("Only the assigned agent can submit deliverables");
+  if (task.status !== "assigned") throw new Error("Task is not in assigned state");
+
+  const id = uuid();
+  db.prepare(`INSERT INTO deliverables (id, task_id, submitter_id, content) VALUES (?, ?, ?, ?)`).run(id, taskId, submitterId, content);
+  db.prepare("UPDATE tasks SET status = 'delivered' WHERE id = ?").run(taskId);
+  return { id, taskId, submitterId, content, status: "submitted" };
+};
+
+export const reviewDeliverable = (deliverableId, posterId, approved, notes) => {
+  const del = db.prepare("SELECT * FROM deliverables WHERE id = ?").get(deliverableId);
+  if (!del) throw new Error("Deliverable not found");
+  const task = getTask(del.task_id);
+  if (!task) throw new Error("Task not found");
+  if (task.posterId !== posterId) throw new Error("Only the task poster can review deliverables");
+
+  if (approved) {
+    db.prepare("UPDATE deliverables SET status = 'approved', reviewer_notes = ? WHERE id = ?").run(notes || "", deliverableId);
+    db.prepare("UPDATE tasks SET status = 'completed' WHERE id = ?").run(del.task_id);
+  } else {
+    db.prepare("UPDATE deliverables SET status = 'revision_requested', reviewer_notes = ? WHERE id = ?").run(notes || "Revisions needed", deliverableId);
+    db.prepare("UPDATE tasks SET status = 'assigned' WHERE id = ?").run(del.task_id);
+  }
+  return getTask(del.task_id);
+};
+
+export const getDeliverables = (taskId) =>
+  db.prepare(`SELECT d.*, a.name as submitter_name, a.avatar as submitter_avatar FROM deliverables d JOIN agents a ON d.submitter_id = a.id WHERE d.task_id = ? ORDER BY d.created_at DESC`).all(taskId).map(row => ({
+    id: row.id,
+    taskId: row.task_id,
+    submitterId: row.submitter_id,
+    submitterName: row.submitter_name,
+    submitterAvatar: row.submitter_avatar,
+    content: row.content,
+    status: row.status,
+    reviewerNotes: row.reviewer_notes,
+    createdAt: row.created_at,
+  }));
 
 // Stats
 export const getMarketStats = () => {
