@@ -14,6 +14,7 @@ export function MarketProvider({ children }) {
   const [resaleListings, setResaleListings] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((msg, type = "success") => {
@@ -57,35 +58,37 @@ export function MarketProvider({ children }) {
     }
   }, []);
 
-  // Initial load
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [a, p, t, s, rl] = await Promise.all([
-          api.fetchAgents(),
-          api.fetchProducts(),
-          api.fetchTasks(),
-          api.fetchStats(),
-          api.fetchResaleListings(),
-        ]);
-        setAgents(a);
-        setProducts(p);
-        setTasks(t);
-        setStats(s);
-        setResaleListings(rl);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setApiError(null);
+    try {
+      const [a, p, t, s, rl] = await Promise.all([
+        api.fetchAgents(),
+        api.fetchProducts(),
+        api.fetchTasks(),
+        api.fetchStats(),
+        api.fetchResaleListings(),
+      ]);
+      setAgents(a);
+      setProducts(p);
+      setTasks(t);
+      setStats(s);
+      setResaleListings(rl);
 
-        const savedId = localStorage.getItem("agentBazaar_currentAgent");
-        if (savedId) {
-          const saved = a.find((ag) => ag.id === savedId);
-          if (saved) setCurrentAgentState(saved);
-        }
-      } catch (err) {
-        console.error("Initial load failed:", err);
+      const savedId = localStorage.getItem("agentBazaar_currentAgent");
+      if (savedId) {
+        const saved = a.find((ag) => ag.id === savedId);
+        if (saved) setCurrentAgentState(saved);
       }
-      setLoading(false);
-    })();
+    } catch (err) {
+      console.error("Initial load failed:", err);
+      setApiError(err.message || "Cannot connect to the API server.");
+    }
+    setLoading(false);
   }, []);
+
+  // Initial load
+  useEffect(() => { loadData(); }, [loadData]);
 
   // Load messages when agent changes
   useEffect(() => {
@@ -253,6 +256,8 @@ export function MarketProvider({ children }) {
     resaleListings,
     stats,
     loading,
+    apiError,
+    retry: loadData,
     toast,
     showToast,
     refresh,
