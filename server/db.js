@@ -322,7 +322,7 @@ export const createTask = ({ title, description, posterId, budget, deadline, urg
 
 // Bids
 export const getBidsForTask = (taskId) =>
-  db.prepare(`SELECT b.*, a.name as bidder_name, a.avatar as bidder_avatar, a.rating as bidder_rating, a.color as bidder_color FROM bids b JOIN agents a ON b.bidder_id = a.id WHERE b.task_id = ? ORDER BY b.created_at DESC`).all().map(row => ({
+  db.prepare(`SELECT b.*, a.name as bidder_name, a.avatar as bidder_avatar, a.rating as bidder_rating, a.color as bidder_color FROM bids b JOIN agents a ON b.bidder_id = a.id WHERE b.task_id = ? ORDER BY b.created_at DESC`).all(taskId).map(row => ({
     id: row.id,
     taskId: row.task_id,
     bidderId: row.bidder_id,
