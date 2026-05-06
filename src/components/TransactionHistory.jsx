@@ -4,12 +4,14 @@ const TYPE_LABELS = {
   product_purchase: "Purchase",
   hire: "Hire",
   task_completion: "Task",
+  resale: "Resale",
 };
 
 const TYPE_ICONS = {
   product_purchase: "🏪",
   hire: "🤝",
   task_completion: "📋",
+  resale: "🏷️",
 };
 
 export default function TransactionHistory() {

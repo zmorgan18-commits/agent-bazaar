@@ -100,6 +100,15 @@ db.exec(`
     comment     TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS inventory (
+    id          TEXT PRIMARY KEY,
+    owner_id    TEXT NOT NULL REFERENCES agents(id),
+    product_id  TEXT NOT NULL REFERENCES products(id),
+    acquired_at TEXT NOT NULL DEFAULT (datetime('now')),
+    listed_for_resale INTEGER NOT NULL DEFAULT 0,
+    resale_price REAL
+  );
 `);
 
 /* ────────────────────────── Seed ────────────────────────── */
@@ -177,6 +186,14 @@ function seedIfEmpty() {
 
   const insertTxn = db.prepare(`INSERT INTO transactions (id, type, buyer_id, seller_id, item_id, item_name, amount) VALUES (@id, @type, @buyer_id, @seller_id, @item_id, @item_name, @amount)`);
   for (const tx of txns) insertTxn.run(tx);
+
+  const inventoryItems = [
+    { id: uuid(), owner_id: "a4", product_id: "p1" },
+    { id: uuid(), owner_id: "a2", product_id: "p3" },
+    { id: uuid(), owner_id: "a6", product_id: "p5" },
+  ];
+  const insertInv = db.prepare(`INSERT INTO inventory (id, owner_id, product_id) VALUES (@id, @owner_id, @product_id)`);
+  for (const inv of inventoryItems) insertInv.run(inv);
 }
 
 seedIfEmpty();
@@ -300,6 +317,8 @@ export const purchaseProduct = (productId, buyerId) => {
     db.prepare("UPDATE products SET sales = sales + 1 WHERE id = ?").run(productId);
     const txId = uuid();
     db.prepare(`INSERT INTO transactions (id, type, buyer_id, seller_id, item_id, item_name, amount) VALUES (?, 'product_purchase', ?, ?, ?, ?, ?)`).run(txId, buyerId, product.sellerId, productId, product.name, product.price);
+    const invId = uuid();
+    db.prepare(`INSERT INTO inventory (id, owner_id, product_id) VALUES (?, ?, ?)`).run(invId, buyerId, productId);
     return txId;
   });
 
@@ -480,6 +499,88 @@ export const getReviews = (targetId) =>
     comment: row.comment,
     createdAt: row.created_at,
   }));
+
+// Inventory
+export const getInventory = (ownerId) =>
+  db.prepare(`SELECT i.*, p.name as product_name, p.icon as product_icon, p.category as product_category, p.price as original_price, p.description as product_desc, p.color as product_color, p.tags as product_tags, a.name as seller_name FROM inventory i JOIN products p ON i.product_id = p.id JOIN agents a ON p.seller_id = a.id WHERE i.owner_id = ? ORDER BY i.acquired_at DESC`).all(ownerId).map(row => {
+    let tags = row.product_tags;
+    if (typeof tags === "string") { try { tags = JSON.parse(tags); } catch { /* keep */ } }
+    return {
+      id: row.id,
+      ownerId: row.owner_id,
+      productId: row.product_id,
+      productName: row.product_name,
+      productIcon: row.product_icon,
+      productCategory: row.product_category,
+      productDesc: row.product_desc,
+      productColor: row.product_color,
+      productTags: tags,
+      originalPrice: row.original_price,
+      originalSeller: row.seller_name,
+      acquiredAt: row.acquired_at,
+      listedForResale: !!row.listed_for_resale,
+      resalePrice: row.resale_price,
+    };
+  });
+
+export const listForResale = (inventoryId, ownerId, resalePrice) => {
+  const item = db.prepare("SELECT * FROM inventory WHERE id = ? AND owner_id = ?").get(inventoryId, ownerId);
+  if (!item) throw new Error("Inventory item not found");
+  db.prepare("UPDATE inventory SET listed_for_resale = 1, resale_price = ? WHERE id = ?").run(resalePrice, inventoryId);
+  return { id: inventoryId, resalePrice };
+};
+
+export const unlistFromResale = (inventoryId, ownerId) => {
+  const item = db.prepare("SELECT * FROM inventory WHERE id = ? AND owner_id = ?").get(inventoryId, ownerId);
+  if (!item) throw new Error("Inventory item not found");
+  db.prepare("UPDATE inventory SET listed_for_resale = 0, resale_price = NULL WHERE id = ?").run(inventoryId);
+  return { id: inventoryId };
+};
+
+export const getResaleListings = () =>
+  db.prepare(`SELECT i.*, p.name as product_name, p.icon as product_icon, p.category as product_category, p.description as product_desc, p.price as original_price, p.color as product_color, p.tags as product_tags, a.name as owner_name, a.avatar as owner_avatar, a.color as owner_color FROM inventory i JOIN products p ON i.product_id = p.id JOIN agents a ON i.owner_id = a.id WHERE i.listed_for_resale = 1 ORDER BY i.resale_price ASC`).all().map(row => {
+    let tags = row.product_tags;
+    if (typeof tags === "string") { try { tags = JSON.parse(tags); } catch { /* keep */ } }
+    return {
+      id: row.id,
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      ownerAvatar: row.owner_avatar,
+      ownerColor: row.owner_color,
+      productId: row.product_id,
+      productName: row.product_name,
+      productIcon: row.product_icon,
+      productCategory: row.product_category,
+      productDesc: row.product_desc,
+      productColor: row.product_color,
+      productTags: tags,
+      originalPrice: row.original_price,
+      resalePrice: row.resale_price,
+    };
+  });
+
+export const buyResaleListing = (inventoryId, buyerId) => {
+  const item = db.prepare("SELECT * FROM inventory WHERE id = ? AND listed_for_resale = 1").get(inventoryId);
+  if (!item) throw new Error("Listing not found");
+  if (item.owner_id === buyerId) throw new Error("Cannot buy your own listing");
+  const buyer = getAgent(buyerId);
+  if (!buyer) throw new Error("Buyer not found");
+  if (buyer.balance < item.resale_price) throw new Error("Insufficient balance");
+
+  const product = getProduct(item.product_id);
+
+  const txn = db.transaction(() => {
+    updateAgentBalance(buyerId, -item.resale_price);
+    updateAgentBalance(item.owner_id, item.resale_price);
+    db.prepare("UPDATE inventory SET owner_id = ?, listed_for_resale = 0, resale_price = NULL, acquired_at = datetime('now') WHERE id = ?").run(buyerId, inventoryId);
+    const txId = uuid();
+    db.prepare(`INSERT INTO transactions (id, type, buyer_id, seller_id, item_id, item_name, amount) VALUES (?, 'resale', ?, ?, ?, ?, ?)`).run(txId, buyerId, item.owner_id, item.product_id, product ? product.name : "Unknown Product", item.resale_price);
+    return txId;
+  });
+
+  txn();
+  return { buyer: getAgent(buyerId), seller: getAgent(item.owner_id) };
+};
 
 // Stats
 export const getMarketStats = () => {

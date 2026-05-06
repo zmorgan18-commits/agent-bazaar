@@ -10,6 +10,8 @@ export function MarketProvider({ children }) {
   const [tasks, setTasks] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [resaleListings, setResaleListings] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -21,16 +23,18 @@ export function MarketProvider({ children }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [a, p, t, s] = await Promise.all([
+      const [a, p, t, s, rl] = await Promise.all([
         api.fetchAgents(),
         api.fetchProducts(),
         api.fetchTasks(),
         api.fetchStats(),
+        api.fetchResaleListings(),
       ]);
       setAgents(a);
       setProducts(p);
       setTasks(t);
       setStats(s);
+      setResaleListings(rl);
     } catch (err) {
       console.error("Failed to refresh:", err);
     }
@@ -58,16 +62,18 @@ export function MarketProvider({ children }) {
     (async () => {
       setLoading(true);
       try {
-        const [a, p, t, s] = await Promise.all([
+        const [a, p, t, s, rl] = await Promise.all([
           api.fetchAgents(),
           api.fetchProducts(),
           api.fetchTasks(),
           api.fetchStats(),
+          api.fetchResaleListings(),
         ]);
         setAgents(a);
         setProducts(p);
         setTasks(t);
         setStats(s);
+        setResaleListings(rl);
 
         const savedId = localStorage.getItem("agentBazaar_currentAgent");
         if (savedId) {
@@ -87,6 +93,12 @@ export function MarketProvider({ children }) {
     api.fetchMessages(currentAgent.id).then(setMessages).catch(console.error);
   }, [currentAgent]);
 
+  // Load inventory when agent changes
+  useEffect(() => {
+    if (!currentAgent) { setInventory([]); return; }
+    api.fetchInventory(currentAgent.id).then(setInventory).catch(console.error);
+  }, [currentAgent]);
+
   // Load transactions when agent changes
   useEffect(() => {
     if (!currentAgent) { setTransactions([]); return; }
@@ -97,10 +109,11 @@ export function MarketProvider({ children }) {
     if (!currentAgent) { showToast("Select an agent identity first", "error"); return; }
     try {
       const result = await api.purchaseProduct(productId, currentAgent.id);
-      showToast(`Purchased ${result.product.name} for ${result.product.price} cr!`);
+      showToast(`Purchased ${result.product.name} for ${result.product.price} cr — added to your inventory!`);
       await refresh();
       await refreshAgent();
       api.fetchTransactions(currentAgent.id).then(setTransactions);
+      api.fetchInventory(currentAgent.id).then(setInventory);
     } catch (err) {
       showToast(err.message, "error");
     }
@@ -179,6 +192,44 @@ export function MarketProvider({ children }) {
     }
   }, [currentAgent, showToast]);
 
+  const listForResaleAction = useCallback(async (inventoryId, resalePrice) => {
+    if (!currentAgent) { showToast("Select an agent identity first", "error"); return; }
+    try {
+      await api.listForResale(inventoryId, currentAgent.id, resalePrice);
+      showToast(`Listed for resale at ${resalePrice} cr!`);
+      await refresh();
+      api.fetchInventory(currentAgent.id).then(setInventory);
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }, [currentAgent, refresh, showToast]);
+
+  const unlistFromResaleAction = useCallback(async (inventoryId) => {
+    if (!currentAgent) { showToast("Select an agent identity first", "error"); return; }
+    try {
+      await api.unlistFromResale(inventoryId, currentAgent.id);
+      showToast("Removed from resale listings.");
+      await refresh();
+      api.fetchInventory(currentAgent.id).then(setInventory);
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }, [currentAgent, refresh, showToast]);
+
+  const buyResaleListingAction = useCallback(async (inventoryId) => {
+    if (!currentAgent) { showToast("Select an agent identity first", "error"); return; }
+    try {
+      await api.buyResaleListing(inventoryId, currentAgent.id);
+      showToast("Purchased from resale — added to your inventory!");
+      await refresh();
+      await refreshAgent();
+      api.fetchTransactions(currentAgent.id).then(setTransactions);
+      api.fetchInventory(currentAgent.id).then(setInventory);
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }, [currentAgent, refresh, refreshAgent, showToast]);
+
   const addReviewAction = useCallback(async (targetId, rating, comment, productId) => {
     if (!currentAgent) { showToast("Select an agent identity first", "error"); return; }
     try {
@@ -198,6 +249,8 @@ export function MarketProvider({ children }) {
     tasks,
     transactions,
     messages,
+    inventory,
+    resaleListings,
     stats,
     loading,
     toast,
@@ -212,6 +265,9 @@ export function MarketProvider({ children }) {
     createTask: createTaskAction,
     sendMessage: sendMessageAction,
     addReview: addReviewAction,
+    listForResale: listForResaleAction,
+    unlistFromResale: unlistFromResaleAction,
+    buyResaleListing: buyResaleListingAction,
   };
 
   return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;

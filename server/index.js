@@ -151,6 +151,38 @@ app.post("/api/reviews", wrap((req, res) => {
   res.status(201).json(review);
 }));
 
+/* ────────────────────── Inventory ────────────────────── */
+app.get("/api/inventory", wrap((req, res) => {
+  const { agentId } = req.query;
+  if (!agentId) return res.status(400).json({ error: "agentId query param required" });
+  res.json(db.getInventory(agentId));
+}));
+
+app.get("/api/resale-listings", wrap((req, res) => {
+  res.json(db.getResaleListings());
+}));
+
+app.post("/api/inventory/:id/list", wrap((req, res) => {
+  const { ownerId, resalePrice } = req.body;
+  if (!ownerId || !resalePrice) return res.status(400).json({ error: "ownerId and resalePrice are required" });
+  const result = db.listForResale(req.params.id, ownerId, parseFloat(resalePrice));
+  res.json(result);
+}));
+
+app.post("/api/inventory/:id/unlist", wrap((req, res) => {
+  const { ownerId } = req.body;
+  if (!ownerId) return res.status(400).json({ error: "ownerId is required" });
+  const result = db.unlistFromResale(req.params.id, ownerId);
+  res.json(result);
+}));
+
+app.post("/api/inventory/:id/buy", wrap((req, res) => {
+  const { buyerId } = req.body;
+  if (!buyerId) return res.status(400).json({ error: "buyerId is required" });
+  const result = db.buyResaleListing(req.params.id, buyerId);
+  res.json(result);
+}));
+
 /* ────────────────────── Stats ────────────────────── */
 app.get("/api/stats", wrap((req, res) => {
   res.json(db.getMarketStats());

@@ -10,6 +10,7 @@ import CreateTaskForm from "./components/CreateTaskForm";
 import TransactionHistory from "./components/TransactionHistory";
 import MessageCenter from "./components/MessageCenter";
 import BidPanel from "./components/BidPanel";
+import Inventory from "./components/Inventory";
 
 export default function App() {
   const {
@@ -162,6 +163,7 @@ export default function App() {
             { key: "products", label: "Products", icon: "🏪" },
             { key: "agents", label: "Agents", icon: "🤖" },
             { key: "tasks", label: "Tasks", icon: "📋" },
+            { key: "inventory", label: "Inventory", icon: "📦" },
             { key: "transactions", label: "Ledger", icon: "📒" },
             { key: "messages", label: "Messages", icon: "💬" },
           ].map((t) => (
@@ -182,7 +184,7 @@ export default function App() {
           ))}
         </div>
 
-        {(tab === "products" || tab === "agents" || tab === "tasks") && (
+        {(tab === "products" || tab === "agents" || tab === "tasks" || tab === "inventory") && (
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -246,6 +248,7 @@ export default function App() {
             ))}
           </div>
         )}
+        {tab === "inventory" && <Inventory />}
         {tab === "transactions" && <TransactionHistory />}
         {tab === "messages" && <MessageCenter />}
 
